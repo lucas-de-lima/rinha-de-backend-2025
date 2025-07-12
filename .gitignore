@@ -15,10 +15,9 @@ bin/
 dist/
 build/
 
-# Bancos de dados SQLite (dados de teste)
+# Bancos de dados BBolt (dados de teste)
 data/*.db
-data/*.sqlite
-data/*.sqlite3
+data/*.bolt
 
 # Logs
 *.log

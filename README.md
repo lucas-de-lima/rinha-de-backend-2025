@@ -29,7 +29,7 @@ Uma solução robusta para processamento de pagamentos com arquitetura distribu�
                                               │
                                               ▼
                                     ┌─────────────────┐
-                                    │   SQLite DB     │
+                                    │   BBolt DB      │
                                     │   (Persistência)│
                                     └─────────────────┘
 ```
@@ -124,8 +124,8 @@ Uma solução robusta para processamento de pagamentos com arquitetura distribu�
 - [x] Integração com API Gateway
 
 ### ✅ **História 5: A Persistência** - CONCLUÍDA
-- [x] Camada de persistência com SQLite
-- [x] Migrations automáticas
+- [x] Camada de persistência com BBolt
+- [x] Buckets automáticos
 - [x] Operações CRUD completas
 - [x] Recuperação de dados após reinicialização
 - [x] Estatísticas e consultas otimizadas
@@ -234,23 +234,23 @@ curl "http://localhost:9999/payments-summary"
 
 ## 🗄️ **Persistência de Dados**
 
-### Banco de Dados SQLite
+### Banco de Dados BBolt
 - **Localização**: `./data/payments.db`
-- **Migrations**: Automáticas na inicialização
-- **Índices**: Otimizados para consultas por cliente e data
+- **Buckets**: Automáticos na inicialização
+- **Serialização**: Gob encoding para performance máxima
 
-### Estrutura da Tabela
-```sql
-CREATE TABLE payments (
-    id TEXT PRIMARY KEY,
-    customer_id TEXT NOT NULL,
-    amount REAL NOT NULL,
-    description TEXT,
-    status TEXT NOT NULL,
-    processor_used TEXT,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
-);
+### Estrutura dos Dados
+```go
+type Payment struct {
+    ID            string    `json:"id"`
+    CustomerID    string    `json:"customer_id"`
+    Amount        float64   `json:"amount"`
+    Description   string    `json:"description"`
+    Status        string    `json:"status"`
+    ProcessorUsed string    `json:"processor_used"`
+    CreatedAt     time.Time `json:"created_at"`
+    UpdatedAt     time.Time `json:"updated_at"`
+}
 ```
 
 ## 🧪 **Testes**
@@ -323,7 +323,7 @@ rinha-de-backend-2025/
 ├── config/                # Configurações
 ├── examples/              # Exemplos e testes
 ├── scripts/               # Scripts de automação
-├── data/                  # Banco de dados SQLite
+├── data/                  # Banco de dados BBolt
 ├── docker-compose.yml     # Conforme Rinha 2025
 └── info.json              # Tecnologias utilizadas
 ```

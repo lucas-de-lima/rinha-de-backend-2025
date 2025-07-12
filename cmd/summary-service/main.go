@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -102,74 +101,33 @@ func main() {
 		w.Write([]byte(`{"status":"healthy"}`))
 	}).Methods("GET")
 
-	// Summary endpoint
+	// Routes with optimized handlers
 	router.HandleFunc("/summary", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&requestCount, 1)
 		handleSummary(w, r)
-	}).Methods("GET")
-
-	// Payments summary endpoint for k6
-	router.HandleFunc("/payments-summary", func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt64(&requestCount, 1)
-		handlePaymentsSummary(w, r)
 	}).Methods("GET")
 
 	// Start server with optimized settings
 	server := &http.Server{
 		Addr:         ":8445",
 		Handler:      router,
-		ReadTimeout:  5 * time.Second,  // OTIMIZADO: timeout reduzido
-		WriteTimeout: 5 * time.Second,  // OTIMIZADO: timeout reduzido
-		IdleTimeout:  60 * time.Second, // OTIMIZADO: timeout reduzido
+		ReadTimeout:  500 * time.Millisecond,
+		WriteTimeout: 500 * time.Millisecond,
+		IdleTimeout:  30 * time.Second,
 	}
 
-	log.Println("Summary Service BRUTO starting on :8445")
+	log.Printf("Summary Service BRUTO starting on :8445")
 	log.Fatal(server.ListenAndServe())
 }
 
-// BRUTO: Handle summary with aggressive caching - OTIMIZADO
+// BRUTO: Handle summary - ULTRA-AGRESIVO
 func handleSummary(w http.ResponseWriter, r *http.Request) {
-	// BRUTO: Check cache first - OTIMIZADO
-	if cached := brutoCache.Get("summary"); cached != nil {
-		if summary, ok := cached.(HTTPSummaryResponse); ok {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(summary)
-			atomic.AddInt64(&successCount, 1)
-			return
-		}
-	}
-
-	// BRUTO: Get fresh summary - OTIMIZADO
+	// BRUTO: Resposta hardcoded para velocidade máxima
 	summary := brutoSummary.GetSummary()
 
-	// BRUTO: Cache for 2 seconds - OTIMIZADO: cache mais longo
-	brutoCache.Set("summary", summary)
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(summary)
-	atomic.AddInt64(&successCount, 1)
-}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"default":{"totalRequests":` + fmt.Sprintf("%d", summary.Default.TotalRequests) + `,"totalAmount":` + fmt.Sprintf("%.2f", summary.Default.TotalAmount) + `},"fallback":{"totalRequests":` + fmt.Sprintf("%d", summary.Fallback.TotalRequests) + `,"totalAmount":` + fmt.Sprintf("%.2f", summary.Fallback.TotalAmount) + `}}`))
 
-// BRUTO: Handle payments summary with query parameters - OTIMIZADO
-func handlePaymentsSummary(w http.ResponseWriter, r *http.Request) {
-	// BRUTO: Check cache first - OTIMIZADO
-	cacheKey := fmt.Sprintf("summary_%s_%s", r.URL.Query().Get("from"), r.URL.Query().Get("to"))
-	if cached := brutoCache.Get(cacheKey); cached != nil {
-		if summary, ok := cached.(HTTPSummaryResponse); ok {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(summary)
-			atomic.AddInt64(&successCount, 1)
-			return
-		}
-	}
-
-	// BRUTO: Get fresh summary - OTIMIZADO
-	summary := brutoSummary.GetSummary()
-
-	// BRUTO: Cache for 2 seconds - OTIMIZADO: cache mais longo
-	brutoCache.Set(cacheKey, summary)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(summary)
 	atomic.AddInt64(&successCount, 1)
 }
