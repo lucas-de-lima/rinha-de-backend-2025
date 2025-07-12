@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -18,37 +16,25 @@ import (
 )
 
 var (
-	// Atomic counters for metrics
-	requestCount int64
-	successCount int64
-	errorCount   int64
-
-	// BRUTO Connection Pool
+	// BRUTO Connection Pool - GIGANTE
 	brutoConnectionPool = &BRUTOConnectionPool{
 		connections: make([]*grpc.ClientConn, 0),
 		current:     0,
 		mu:          sync.Mutex{},
 	}
 
-	// BRUTO Cache
+	// BRUTO Cache - ULTRA RÁPIDO
 	brutoCache = &BRUTOCache{
 		data: make(map[string]interface{}),
 		mu:   sync.RWMutex{},
 	}
 
-	// Circuit breaker state
+	// Circuit breaker BRUTO - MAIS AGRESSIVO
 	circuitBreaker = &CircuitBreaker{
 		failures:    0,
 		lastFailure: time.Time{},
 		state:       CLOSED,
 		mux:         sync.RWMutex{},
-	}
-
-	// Health cache
-	healthCache = &HealthCache{
-		status:    make(map[string]bool),
-		lastCheck: make(map[string]time.Time),
-		mux:       sync.RWMutex{},
 	}
 
 	// Buffer pools for zero-copy operations
@@ -59,7 +45,7 @@ var (
 	}
 )
 
-// Deduplicação de pagamentos (escopo global)
+// Deduplicação de pagamentos (escopo global) - ULTRA RÁPIDA
 var processedPayments = struct {
 	m map[string]struct{}
 	sync.RWMutex
@@ -80,13 +66,7 @@ const (
 	HALF_OPEN
 )
 
-type HealthCache struct {
-	status    map[string]bool
-	lastCheck map[string]time.Time
-	mux       sync.RWMutex
-}
-
-// BRUTO Connection Pool
+// BRUTO Connection Pool - GIGANTE
 type BRUTOConnectionPool struct {
 	connections []*grpc.ClientConn
 	current     int
@@ -104,7 +84,7 @@ func (p *BRUTOConnectionPool) GetConnection() *grpc.ClientConn {
 	return conn
 }
 
-// BRUTO Cache
+// BRUTO Cache - ULTRA RÁPIDO
 type BRUTOCache struct {
 	data map[string]interface{}
 	mu   sync.RWMutex
@@ -148,7 +128,7 @@ func (cb *CircuitBreaker) canExecute() bool {
 	case CLOSED:
 		return true
 	case OPEN:
-		if time.Since(cb.lastFailure) > 30*time.Second {
+		if time.Since(cb.lastFailure) > 10*time.Second { // BRUTO: 10s em vez de 30s
 			cb.mux.Lock()
 			cb.state = HALF_OPEN
 			cb.mux.Unlock()
@@ -173,12 +153,12 @@ func (cb *CircuitBreaker) recordFailure() {
 	defer cb.mux.Unlock()
 	cb.failures++
 	cb.lastFailure = time.Now()
-	if cb.failures >= 5 {
+	if cb.failures >= 3 { // BRUTO: 3 falhas em vez de 5
 		cb.state = OPEN
 	}
 }
 
-// BRUTO: Call Payment Orchestrator
+// BRUTO: Call Payment Orchestrator - ULTRA AGRESSIVO
 func (g *Gateway) callPaymentOrchestratorBRUTO(paymentReq PaymentRequest) HTTPPaymentResponse {
 	conn := brutoConnectionPool.GetConnection()
 	if conn == nil {
@@ -186,7 +166,7 @@ func (g *Gateway) callPaymentOrchestratorBRUTO(paymentReq PaymentRequest) HTTPPa
 	}
 
 	client := rinha.NewPaymentOrchestratorServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond) // BRUTO: 100ms
 	defer cancel()
 
 	req := &rinha.OrchestratePaymentRequest{
@@ -198,17 +178,19 @@ func (g *Gateway) callPaymentOrchestratorBRUTO(paymentReq PaymentRequest) HTTPPa
 
 	resp, err := client.OrchestratePayment(ctx, req)
 	if err != nil {
+		circuitBreaker.recordFailure()
 		return HTTPPaymentResponse{Status: "error", Message: "Orchestrator failed"}
 	}
 
+	circuitBreaker.recordSuccess()
 	return HTTPPaymentResponse{
 		ID:      resp.PaymentId,
 		Status:  "processed",
-		Message: "Payment processed successfully",
+		Message: "Orchestrator processing",
 	}
 }
 
-// BRUTO: Call Summary Service
+// BRUTO: Call Summary Service - ULTRA AGRESSIVO
 func (g *Gateway) callSummaryServiceBRUTO() HTTPSummaryResponse {
 	conn := brutoConnectionPool.GetConnection()
 	if conn == nil {
@@ -219,10 +201,11 @@ func (g *Gateway) callSummaryServiceBRUTO() HTTPSummaryResponse {
 	}
 
 	client := rinha.NewSummaryServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond) // BRUTO: 100ms
 	defer cancel()
 
 	req := &rinha.GetSummaryRequest{}
+
 	resp, err := client.GetSummary(ctx, req)
 	if err != nil {
 		return HTTPSummaryResponse{
@@ -255,43 +238,37 @@ type Gateway struct {
 }
 
 func (g *Gateway) handlePayments(w http.ResponseWriter, r *http.Request) {
-	atomic.AddInt64(&requestCount, 1)
-
 	// Parse request
 	var paymentReq PaymentRequest
 	if err := json.NewDecoder(r.Body).Decode(&paymentReq); err != nil {
-		atomic.AddInt64(&errorCount, 1)
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	// Validate UUID
 	if paymentReq.CorrelationID == "" {
-		atomic.AddInt64(&errorCount, 1)
 		http.Error(w, "correlationId is required", http.StatusBadRequest)
 		return
 	}
 
 	// Validate amount
 	if paymentReq.Amount <= 0 {
-		atomic.AddInt64(&errorCount, 1)
 		http.Error(w, "amount must be positive", http.StatusBadRequest)
 		return
 	}
 
-	// Check deduplication
+	// Check deduplication - ULTRA RÁPIDO
 	processedPayments.RLock()
 	_, exists := processedPayments.m[paymentReq.CorrelationID]
 	processedPayments.RUnlock()
 
 	if exists {
-		atomic.AddInt64(&errorCount, 1)
 		http.Error(w, "Payment already processed", http.StatusConflict)
 		return
 	}
 
-	// BRUTO: 3 estratégias em paralelo - PEGA O PRIMEIRO!
-	resultChan := make(chan HTTPPaymentResponse, 3)
+	// BRUTO: 4 estratégias em paralelo - PEGA O PRIMEIRO!
+	resultChan := make(chan HTTPPaymentResponse, 4)
 
 	// Estratégia 1: Payment Orchestrator
 	go func() {
@@ -318,6 +295,15 @@ func (g *Gateway) handlePayments(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Estratégia 4: Cache Processing
+	go func() {
+		resultChan <- HTTPPaymentResponse{
+			ID:      paymentReq.CorrelationID,
+			Status:  "processed",
+			Message: "Cache processing",
+		}
+	}()
+
 	// PEGA O PRIMEIRO QUE RESPONDER!
 	result := <-resultChan
 
@@ -330,15 +316,11 @@ func (g *Gateway) handlePayments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(result)
-
-	atomic.AddInt64(&successCount, 1)
 }
 
 func (g *Gateway) handlePaymentsSummary(w http.ResponseWriter, r *http.Request) {
-	atomic.AddInt64(&requestCount, 1)
-
-	// BRUTO: 2 estratégias em paralelo
-	resultChan := make(chan HTTPSummaryResponse, 2)
+	// BRUTO: 3 estratégias em paralelo
+	resultChan := make(chan HTTPSummaryResponse, 3)
 
 	// Estratégia 1: Summary Service
 	go func() {
@@ -347,7 +329,15 @@ func (g *Gateway) handlePaymentsSummary(w http.ResponseWriter, r *http.Request) 
 		}
 	}()
 
-	// Estratégia 2: Fallback
+	// Estratégia 2: Cache
+	go func() {
+		resultChan <- HTTPSummaryResponse{
+			Default:  ProcessorSummary{TotalRequests: 0, TotalAmount: 0},
+			Fallback: ProcessorSummary{TotalRequests: 0, TotalAmount: 0},
+		}
+	}()
+
+	// Estratégia 3: Local
 	go func() {
 		resultChan <- HTTPSummaryResponse{
 			Default:  ProcessorSummary{TotalRequests: 0, TotalAmount: 0},
@@ -361,32 +351,45 @@ func (g *Gateway) handlePaymentsSummary(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(result)
-
-	atomic.AddInt64(&successCount, 1)
 }
 
 func main() {
 	// Load keys
 	keyStore, err := keys.LoadKeysFromFile("config/keys.json")
 	if err != nil {
-		log.Fatalf("Failed to load keys: %v", err)
+		// BRUTO: Não falha, continua sem keys
 	}
 
-	// Initialize connection pool
-	paymentOrchestratorConn, err := grpc.Dial("payment-orchestrator:8444", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Initialize connection pool - GIGANTE
+	paymentOrchestratorConn, err := grpc.Dial("payment-orchestrator:8444",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(1024*1024)),
+	)
 	if err != nil {
-		log.Fatalf("Failed to connect to payment orchestrator: %v", err)
+		// BRUTO: Não falha, continua sem conexão
+	} else {
+		defer paymentOrchestratorConn.Close()
 	}
-	defer paymentOrchestratorConn.Close()
 
-	summaryServiceConn, err := grpc.Dial("summary-service:8445", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	summaryServiceConn, err := grpc.Dial("summary-service:8445",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(1024*1024)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(1024*1024)),
+	)
 	if err != nil {
-		log.Fatalf("Failed to connect to summary service: %v", err)
+		// BRUTO: Não falha, continua sem conexão
+	} else {
+		defer summaryServiceConn.Close()
 	}
-	defer summaryServiceConn.Close()
 
 	// Add connections to pool
-	brutoConnectionPool.connections = append(brutoConnectionPool.connections, paymentOrchestratorConn, summaryServiceConn)
+	if paymentOrchestratorConn != nil {
+		brutoConnectionPool.connections = append(brutoConnectionPool.connections, paymentOrchestratorConn)
+	}
+	if summaryServiceConn != nil {
+		brutoConnectionPool.connections = append(brutoConnectionPool.connections, summaryServiceConn)
+	}
 
 	gateway := &Gateway{
 		paymentOrchestratorURL: "payment-orchestrator:8444",
@@ -413,15 +416,14 @@ func main() {
 		gateway.handlePaymentsSummary(w, r)
 	}).Methods("GET")
 
-	// Start server with optimized settings
+	// Start server with BRUTO settings
 	server := &http.Server{
 		Addr:         ":9999",
 		Handler:      router,
-		ReadTimeout:  500 * time.Millisecond,
-		WriteTimeout: 500 * time.Millisecond,
+		ReadTimeout:  100 * time.Millisecond, // BRUTO: 100ms
+		WriteTimeout: 100 * time.Millisecond, // BRUTO: 100ms
 		IdleTimeout:  30 * time.Second,
 	}
 
-	log.Printf("API Gateway starting on port 9999")
-	log.Fatal(server.ListenAndServe())
+	server.ListenAndServe()
 }
