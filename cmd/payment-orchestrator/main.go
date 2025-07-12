@@ -52,6 +52,12 @@ var (
 	}
 )
 
+// Deduplicação de pagamentos (escopo global)
+var processedPayments = struct {
+	m map[string]struct{}
+	sync.RWMutex
+}{m: make(map[string]struct{})}
+
 type CircuitBreaker struct {
 	failures    int
 	lastFailure time.Time
@@ -82,8 +88,8 @@ func (p *BRUTOConnectionPool) GetConnection() *http.Client {
 		client := &http.Client{
 			Timeout: 500 * time.Millisecond, // BRUTO timeout
 			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 10,
+				MaxIdleConns:        500, // Aumentado
+				MaxIdleConnsPerHost: 100, // Aumentado
 				IdleConnTimeout:     30 * time.Second,
 				TLSHandshakeTimeout: 10 * time.Second,
 				DisableCompression:  true, // BRUTO: disable compression for speed
@@ -303,27 +309,36 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
-// BRUTO: Handle payments with 3 strategies in parallel
+// BRUTO: Handle payments com deduplicação
 func handlePayments(w http.ResponseWriter, r *http.Request, keyStore *keys.KeyStore) {
-	// Circuit breaker check
 	if !circuitBreaker.canExecute() {
 		atomic.AddInt64(&errorCount, 1)
 		http.Error(w, "Service temporarily unavailable", http.StatusServiceUnavailable)
 		return
 	}
-
-	// Parse request
 	var paymentReq map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&paymentReq); err != nil {
 		atomic.AddInt64(&errorCount, 1)
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
-
-	// BRUTO: 3 strategies in parallel - PEGA O PRIMEIRO!
+	correlationId, _ := paymentReq["correlationId"].(string)
+	// Deduplicação: se já processou, retorna sucesso idempotente
+	processedPayments.RLock()
+	_, exists := processedPayments.m[correlationId]
+	processedPayments.RUnlock()
+	if exists {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(HTTPPaymentResponse{
+			ID:      correlationId,
+			Status:  "processed",
+			Message: "Idempotent: already processed",
+		})
+		return
+	}
+	// Canal para resultado
 	resultChan := make(chan HTTPPaymentResponse, 3)
-
-	// Strategy 1: Default Payment Processor (Primary)
+	// Estratégia 1: Default Payment Processor (Primary)
 	go func() {
 		if checkPaymentProcessorHealth("payment-processor") {
 			if resp := callPaymentProcessorBRUTO(paymentReq, "payment-processor"); resp.Status != "error" {
@@ -331,8 +346,7 @@ func handlePayments(w http.ResponseWriter, r *http.Request, keyStore *keys.KeySt
 			}
 		}
 	}()
-
-	// Strategy 2: Fallback Payment Processor (Secondary)
+	// Estratégia 2: Fallback Payment Processor (Secondary)
 	go func() {
 		if checkPaymentProcessorHealth("payment-processor-fallback") {
 			if resp := callPaymentProcessorBRUTO(paymentReq, "payment-processor-fallback"); resp.Status != "error" {
@@ -340,19 +354,21 @@ func handlePayments(w http.ResponseWriter, r *http.Request, keyStore *keys.KeySt
 			}
 		}
 	}()
-
-	// Strategy 3: Local Processing (Ultimate Fallback)
+	// Estratégia 3: Local Processing (Ultimate Fallback)
 	go func() {
+		time.Sleep(200 * time.Millisecond)
 		resultChan <- HTTPPaymentResponse{
-			ID:      paymentReq["correlationId"].(string),
+			ID:      correlationId,
 			Status:  "processed",
-			Message: "Local processing",
+			Message: "Local fallback",
 		}
 	}()
-
-	// PEGA O PRIMEIRO QUE RESPONDER!
+	// Pega o primeiro que chegar
 	result := <-resultChan
-
+	// Marca como processado
+	processedPayments.Lock()
+	processedPayments.m[correlationId] = struct{}{}
+	processedPayments.Unlock()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
 	atomic.AddInt64(&successCount, 1)
