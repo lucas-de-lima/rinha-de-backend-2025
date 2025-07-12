@@ -1,0 +1,10 @@
+{
+    "name": "Lucas de Lima",
+    "social": ["https://github.com/lucas-de-lima", "https://www.linkedin.com/in/dev-lucasdelima/"],
+    "source-code-repo": "https://github.com/lucas-de-lima/rinha-de-backend-2025",
+    "langs": ["go"],
+    "storages": ["sqlite"],
+    "messaging": ["grpc"],
+    "load-balancers": [],
+    "other-technologies": ["signet-go", "mTLS", "ed25519", "protobuf"]
+} 

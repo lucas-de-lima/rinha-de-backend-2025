@@ -1,0 +1,69 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Scripts and tools
+scripts/
+*.sh
+*.ps1
+*.bat
+
+# Test files
+*_test.go
+test/
+tests/
+rinha-test/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Go specific
+vendor/
+*.test
+coverage.out
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Payment processor (external)
+payment-processor/
+
+# Generated files (will be regenerated in container)
+internal/gen/
+
+# Development files
+gen_ed25519_keys.go 

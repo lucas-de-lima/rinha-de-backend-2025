@@ -1,0 +1,91 @@
+# Binários e executáveis
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+api-gateway
+payment-orchestrator
+summary-service
+ping-client
+ping-server
+
+# Arquivos de build
+bin/
+dist/
+build/
+
+# Bancos de dados SQLite (dados de teste)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Logs
+*.log
+logs/
+*.out
+
+# Arquivos temporários
+*.tmp
+*.temp
+*~
+
+# Arquivos do sistema
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Arquivos de certificados (se não quiser versionar)
+certs/*.crt
+certs/*.key
+certs/*.pem
+
+# Arquivos de configuração local
+config/local.json
+config/dev.json
+
+# Arquivos de cache
+.cache/
+*.cache
+
+# Arquivos de coverage
+coverage.txt
+coverage.out
+*.cover
+
+# Arquivos de profiling
+*.prof
+*.pprof
+
+# Arquivos de backup
+*.bak
+*.backup
+
+# Arquivos de teste temporários
+test-*
+tmp/
+
+# Arquivos do Go
+*.test
+*.prof
+
+# Arquivos de lock
+go.sum

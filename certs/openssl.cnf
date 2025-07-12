@@ -1,0 +1,25 @@
+# OpenSSL minimal config for local certificate generation
+[ req ]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+prompt             = no
+req_extensions     = v3_req
+
+[ req_distinguished_name ]
+C  = BR
+ST = SP
+L  = SaoPaulo
+O  = Rinha
+OU = Dev
+CN = localhost
+
+[ v3_req ]
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 = localhost
+DNS.2 = payment-orchestrator
+DNS.3 = summary-service
+DNS.4 = api-gateway-1
+DNS.5 = api-gateway-2
+IP.1 = 127.0.0.1

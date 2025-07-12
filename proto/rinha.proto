@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package rinha;
+
+option go_package = "github.com/lucas-de-lima/rinha-de-backend-2025/internal/gen/proto;rinha";
+
+// Serviço principal da API Gateway
+service RinhaService {
+  rpc Ping (PingRequest) returns (PingResponse);
+  rpc ProcessPayment (ProcessPaymentRequest) returns (ProcessPaymentResponse);
+  rpc GetPaymentSummary (GetPaymentSummaryRequest) returns (GetPaymentSummaryResponse);
+}
+
+// Serviço interno de orquestração de pagamentos
+service PaymentOrchestratorService {
+  rpc OrchestratePayment (OrchestratePaymentRequest) returns (OrchestratePaymentResponse);
+  rpc GetPaymentStatus (GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+}
+
+// Serviço interno de resumos
+service SummaryService {
+  rpc GetSummary (GetSummaryRequest) returns (GetSummaryResponse);
+  rpc UpdatePaymentRecord (UpdatePaymentRecordRequest) returns (UpdatePaymentRecordResponse);
+}
+
+// Mensagens para RinhaService
+message PingRequest {
+  string message = 1;
+}
+
+message PingResponse {
+  string reply = 1;
+}
+
+message ProcessPaymentRequest {
+  double amount = 1;
+  string description = 2;
+  string customer_id = 3;
+}
+
+message ProcessPaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string message = 3;
+}
+
+message GetPaymentSummaryRequest {
+  string customer_id = 1;
+}
+
+message GetPaymentSummaryResponse {
+  double total_amount = 1;
+  int32 total_payments = 2;
+  repeated PaymentRecord payments = 3;
+}
+
+// Mensagens para PaymentOrchestratorService
+message OrchestratePaymentRequest {
+  double amount = 1;
+  string description = 2;
+  string customer_id = 3;
+  string payment_id = 4;
+}
+
+message OrchestratePaymentResponse {
+  string payment_id = 1;
+  string status = 2;
+  string processor_used = 3;
+  string message = 4;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id = 1;
+}
+
+message GetPaymentStatusResponse {
+  string payment_id = 1;
+  string status = 2;
+  string processor_used = 3;
+  double amount = 4;
+}
+
+// Mensagens para SummaryService
+message GetSummaryRequest {
+  string customer_id = 1;
+}
+
+message GetSummaryResponse {
+  double total_amount = 1;
+  int32 total_payments = 2;
+  repeated PaymentRecord payments = 3;
+}
+
+message UpdatePaymentRecordRequest {
+  PaymentRecord payment = 1;
+}
+
+message UpdatePaymentRecordResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Tipos compartilhados
+message PaymentRecord {
+  string payment_id = 1;
+  string customer_id = 2;
+  double amount = 3;
+  string description = 4;
+  string status = 5;
+  string processor_used = 6;
+  int64 created_at = 7;
+  int64 updated_at = 8;
+}
