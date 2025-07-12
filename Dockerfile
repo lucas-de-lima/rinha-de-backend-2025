@@ -1,4 +1,4 @@
-# Build stage
+# Build stage - OTIMIZADO PARA PERFORMANCE
 FROM golang:1.24.3-alpine AS builder
 
 # Instala apenas dependências essenciais para build
@@ -7,7 +7,7 @@ RUN apk add --no-cache git ca-certificates
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Copia apenas arquivos de dependências primeiro (para cache)
+# Copia apenas arquivos de dependências primeiro (para cache otimizado)
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -22,12 +22,29 @@ RUN go install github.com/bufbuild/buf/cmd/buf@latest && \
 # Gera os stubs do protobuf
 RUN buf generate
 
-# Compila os binários com Go puro (CGO desabilitado)
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o api-gateway ./cmd/api-gateway && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o payment-orchestrator ./cmd/payment-orchestrator && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o summary-service ./cmd/summary-service
+# Compila os binários com flags OTIMIZADOS para performance
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -gcflags="-l=4" \
+    -trimpath \
+    -o api-gateway ./cmd/api-gateway && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -gcflags="-l=4" \
+    -trimpath \
+    -o payment-orchestrator ./cmd/payment-orchestrator && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -gcflags="-l=4" \
+    -trimpath \
+    -o summary-service ./cmd/summary-service && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -gcflags="-l=4" \
+    -trimpath \
+    -o load-balancer ./cmd/load-balancer
 
-# Runtime stage - imagem mínima
+# Runtime stage - IMAGEM MÍNIMA COMPATÍVEL
 FROM alpine:latest AS runtime
 
 # Instala apenas dependências essenciais para runtime
@@ -38,18 +55,20 @@ RUN apk add --no-cache ca-certificates libc6-compat && \
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Copia apenas os binários e arquivos necessários
+# Copia apenas os binários (certificados e config serão montados como volumes)
 COPY --from=builder /app/api-gateway .
 COPY --from=builder /app/payment-orchestrator .
 COPY --from=builder /app/summary-service .
-COPY --from=builder /app/certs ./certs
-COPY --from=builder /app/config ./config
+COPY --from=builder /app/load-balancer .
 
-# Muda para usuário não-root
-# USER appuser
+# Cria diretórios para volumes
+RUN mkdir -p /app/certs /app/config /app/data
+
+# Muda para usuário não-root (segurança)
+USER appuser
 
 # Expõe as portas
-EXPOSE 8443 8444 8445
+EXPOSE 8443 8444 8445 9999
 
 # Comando padrão
 CMD ["./api-gateway"] 

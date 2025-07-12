@@ -1,69 +1,80 @@
-# Git
-.git
-.gitignore
-.gitattributes
-
-# Documentation
-README.md
-*.md
-docs/
-
-# Scripts and tools
-scripts/
-*.sh
-*.ps1
-*.bat
-
-# Test files
-*_test.go
-test/
-tests/
-rinha-test/
-
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
+# Arquivos do sistema
 .DS_Store
 Thumbs.db
 
-# Logs
+# Arquivos de desenvolvimento
 *.log
-logs/
-
-# Temporary files
 *.tmp
 *.temp
-tmp/
-temp/
+.env
+.env.local
+.env.*.local
 
-# Build artifacts
+# Diretórios de desenvolvimento
+node_modules/
+vendor/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Arquivos de build e cache
+build/
+dist/
+target/
 *.exe
 *.dll
 *.so
 *.dylib
-bin/
-dist/
 
-# Go specific
-vendor/
-*.test
-coverage.out
+# Arquivos de teste
+*_test.go
+test/
+tests/
+coverage/
+.coveragerc
 
-# Docker
-Dockerfile*
-docker-compose*
+# Arquivos de documentação
+*.md
+docs/
+documentation/
+
+# Arquivos de configuração de desenvolvimento
+.git/
+.gitignore
 .dockerignore
+Dockerfile*
+docker-compose*.yml
 
-# Payment processor (external)
-payment-processor/
+# Arquivos de CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
 
-# Generated files (will be regenerated in container)
-internal/gen/
+# Arquivos de backup
+*.bak
+*.backup
+*.old
 
-# Development files
-gen_ed25519_keys.go 
+# Arquivos temporários
+tmp/
+temp/
+cache/
+
+# Arquivos específicos do projeto
+rinha-de-backend-2025-main/
+*.exe
+api-gateway.exe
+payment-orchestrator.exe
+summary-service.exe
+payment-orchestrator
+summary-service
+api-gateway
+
+# Arquivos de certificados (serão copiados via volume)
+certs/
+config/
+
+# Arquivos de dados (serão copiados via volume)
+data/ 

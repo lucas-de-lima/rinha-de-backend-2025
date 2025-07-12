@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  # API Gateway - Ponto de entrada HTTP (porta 9999)
-  api-gateway:
+  # Load Balancer - Ponto de entrada (porta 9999) - ULTRA-OTIMIZADO
+  load-balancer:
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,6 +10,30 @@ services:
         - linux/amd64
     ports:
       - "9999:9999"
+    environment:
+      - GOMAXPROCS=1
+    command: ["./load-balancer"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "50MB"
+        reservations:
+          cpus: "0.1"
+          memory: "30MB"
+    networks:
+      - rinha-network
+    depends_on:
+      - api-gateway-1
+      - api-gateway-2
+
+  # API Gateway 1 - Primeira instância - RECURSOS RESTRITOS
+  api-gateway-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
     volumes:
       - ./certs:/app/certs
       - ./config:/app/config
@@ -19,19 +43,59 @@ services:
       - GRPC_PORT=8443
       - PAYMENT_ORCHESTRATOR_URL=payment-orchestrator:8444
       - SUMMARY_SERVICE_URL=summary-service:8445
+      - GOMAXPROCS=2
     command: ["./api-gateway"]
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "128MB"
+          cpus: "0.5"
+          memory: "100MB"
+        reservations:
+          cpus: "0.2"
+          memory: "60MB"
     networks:
       - rinha-network
     depends_on:
       - payment-orchestrator
       - summary-service
+    expose:
+      - "9999"
 
-  # Payment Orchestrator - Microsserviço interno
+  # API Gateway 2 - Segunda instância - RECURSOS RESTRITOS
+  api-gateway-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    volumes:
+      - ./certs:/app/certs
+      - ./config:/app/config
+      - ./data:/app/data
+    environment:
+      - HTTP_PORT=9999
+      - GRPC_PORT=8443
+      - PAYMENT_ORCHESTRATOR_URL=payment-orchestrator:8444
+      - SUMMARY_SERVICE_URL=summary-service:8445
+      - GOMAXPROCS=2
+    command: ["./api-gateway"]
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "100MB"
+        reservations:
+          cpus: "0.2"
+          memory: "60MB"
+    networks:
+      - rinha-network
+    depends_on:
+      - payment-orchestrator
+      - summary-service
+    expose:
+      - "9999"
+
+  # Payment Orchestrator - Microsserviço interno - RECURSOS RESTRITOS
   payment-orchestrator:
     build:
       context: .
@@ -46,19 +110,23 @@ services:
       - GRPC_PORT=8444
       - PAYMENT_PROCESSOR_URL_DEFAULT=http://payment-processor-default:8080
       - PAYMENT_PROCESSOR_URL_FALLBACK=http://payment-processor-fallback:8080
+      - GOMAXPROCS=2
     command: ["./payment-orchestrator"]
     deploy:
       resources:
         limits:
-          cpus: "0.4"
-          memory: "100MB"
+          cpus: "0.2"
+          memory: "50MB"
+        reservations:
+          cpus: "0.1"
+          memory: "30MB"
     networks:
       - rinha-network
       - payment-processor
     expose:
       - "8444"
 
-  # Summary Service - Microsserviço interno
+  # Summary Service - Microsserviço interno - RECURSOS RESTRITOS
   summary-service:
     build:
       context: .
@@ -71,12 +139,16 @@ services:
       - ./data:/app/data
     environment:
       - GRPC_PORT=8445
+      - GOMAXPROCS=2
     command: ["./summary-service"]
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "100MB"
+          cpus: "0.1"
+          memory: "50MB"
+        reservations:
+          cpus: "0.05"
+          memory: "30MB"
     networks:
       - rinha-network
     expose:

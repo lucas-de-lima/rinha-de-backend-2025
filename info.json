@@ -5,6 +5,6 @@
     "langs": ["go"],
     "storages": ["bbolt"],
     "messaging": ["grpc"],
-    "load-balancers": [],
-    "other-technologies": ["signet-go", "mTLS", "ed25519", "protobuf"]
+    "load-balancers": ["custom go load balancer"],
+    "other-technologies": ["protobuf", "round-robin connection pool"]
 } 
