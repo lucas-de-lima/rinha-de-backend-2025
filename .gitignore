@@ -4,9 +4,9 @@
 *.dll
 *.so
 *.dylib
-api-gateway
-payment-orchestrator
-summary-service
+/api-gateway
+/payment-orchestrator
+/summary-service
 ping-client
 ping-server
 
@@ -89,3 +89,5 @@ tmp/
 
 # Arquivos de lock
 go.sum
+
+rinha-de-backend-2025-main
